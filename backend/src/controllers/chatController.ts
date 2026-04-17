@@ -13,10 +13,10 @@ export async function getChats(req: AuthRequest, res: Response, next: NextFuncti
         .sort({lastMessageAt:-1});
 
         const formattedChats = chats.map((chat) => {
-            const otherParticipant = chat.participants.find((p) => p._id.toString() != userId);
+            const otherParticipant = chat.participants.find((p) => p._id.toString() !== userId);
             return {
                 _id:chat._id,
-                participant:otherParticipant,
+                participant:otherParticipant ?? null,
                 lastMessage: chat.lastMessage,
                 lastMessageAt: chat.lastMessageAt,
                 createdAt: chat.createdAt,
@@ -32,8 +32,21 @@ export async function getChats(req: AuthRequest, res: Response, next: NextFuncti
 export async function getChatOrCreateOne(req: AuthRequest, res: Response, next: NextFunction){
     try{
         const userId = req.userId;
-        const { participantId } = req.params;
+        const { participantId } = req.params as {participantId: string};
 
+        if(!participantId){
+            res.status(400).json({ message: "Participant ID is required"});
+            return;
+        }
+
+        if(!Types.ObjectId.isValid(participantId)){
+            return res.status(400).json({message: "Invalid participant ID"});
+        }
+
+        if(userId === participantId){
+            res.status(400).json({message: "Can't create chat with yourself"});
+                return;
+        }
         let chat = await Chat.findOne({
             participants: { $all: [userId, participantId] },
         })
